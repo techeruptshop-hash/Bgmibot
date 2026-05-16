@@ -1,6 +1,6 @@
 import logging
 import asyncio
-from flask import Flask, request, jsonify
+from flask import Flask, request
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
@@ -60,7 +60,8 @@ BGMI_IDS = {
 }
 
 flask_app = Flask(__name__)
-application = Application.builder().token(BOT_TOKEN).build()
+
+ptb_app = Application.builder().token(BOT_TOKEN).build()
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -238,9 +239,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-application.add_handler(CommandHandler("start", start))
-application.add_handler(CallbackQueryHandler(button_handler))
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+ptb_app.add_handler(CommandHandler("start", start))
+ptb_app.add_handler(CallbackQueryHandler(button_handler))
+ptb_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
 
 @flask_app.route("/")
@@ -250,16 +251,30 @@ def home():
 
 @flask_app.route("/webhook", methods=["POST"])
 def webhook():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     data = request.get_json(force=True)
-    update = Update.de_json(data, application.bot)
-    asyncio.run(application.initialize())
-    asyncio.run(application.process_update(update))
+
+    async def process():
+        await ptb_app.initialize()
+        update = Update.de_json(data, ptb_app.bot)
+        await ptb_app.process_update(update)
+
+    loop.run_until_complete(process())
+    loop.close()
     return "OK", 200
 
 
 @flask_app.route("/setwebhook")
 def set_webhook():
-    asyncio.run(application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook"))
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    async def do_set():
+        await ptb_app.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
+
+    loop.run_until_complete(do_set())
+    loop.close()
     return "Webhook set successfully!", 200
 
 
