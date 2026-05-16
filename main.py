@@ -1,4 +1,6 @@
 import logging
+import threading
+from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
@@ -55,6 +57,16 @@ BGMI_IDS = {
         },
     ],
 }
+
+flask_app = Flask(__name__)
+
+@flask_app.route("/")
+def home():
+    return "BGMI Bot is running!", 200
+
+@flask_app.route("/health")
+def health():
+    return "OK", 200
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -232,7 +244,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-def main():
+def run_bot():
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
@@ -242,4 +254,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    bot_thread = threading.Thread(target=run_bot)
+    bot_thread.daemon = True
+    bot_thread.start()
+    flask_app.run(host="0.0.0.0", port=10000)
